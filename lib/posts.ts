@@ -60,3 +60,9 @@ export function getAllPosts(): Post[] {
 export function getPostBySlug(slug: string): Post | undefined {
   return posts.find((post) => post.slug === slug);
 }
+
+export function getNextPost(currentSlug: string): Post | undefined {
+  const index = posts.findIndex((post) => post.slug === currentSlug);
+  if (index === -1 || posts.length <= 1) return undefined;
+  return posts[(index + 1) % posts.length];
+}
