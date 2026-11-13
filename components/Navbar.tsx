@@ -19,12 +19,12 @@ export function Navbar() {
             >
               Articles
             </Link>
-            <a
-              href="#about"
+            <Link
+              href="/dashboard"
               className="transition-colors hover:text-zinc-900 dark:hover:text-zinc-100"
             >
-              About
-            </a>
+              Write
+            </Link>
           </nav>
           <ThemeToggle />
         </div>

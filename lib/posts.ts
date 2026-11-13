@@ -1,3 +1,5 @@
+import { getDbPool } from "./db";
+
 export interface Post {
   slug: string;
   title: string;
@@ -8,7 +10,15 @@ export interface Post {
   content: string[];
 }
 
-export const posts: Post[] = [
+export interface CreatePostInput {
+  title: string;
+  slug?: string;
+  excerpt: string;
+  tag: string;
+  content: string[];
+}
+
+const SEED_POSTS: Post[] = [
   {
     slug: "designing-for-calm-interfaces",
     title: "Designing for Calm Interfaces",
@@ -53,16 +63,178 @@ export const posts: Post[] = [
   },
 ];
 
-export function getAllPosts(): Post[] {
-  return posts;
+let tableInitialized = false;
+
+interface DbPostRow {
+  slug: string;
+  title: string;
+  excerpt: string;
+  published_date: string;
+  read_time: string;
+  tag: string;
+  content: string[];
 }
 
-export function getPostBySlug(slug: string): Post | undefined {
-  return posts.find((post) => post.slug === slug);
+function mapRowToPost(row: DbPostRow): Post {
+  return {
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt,
+    date: row.published_date,
+    readTime: row.read_time,
+    tag: row.tag,
+    content: Array.isArray(row.content) ? row.content : [],
+  };
 }
 
-export function getNextPost(currentSlug: string): Post | undefined {
-  const index = posts.findIndex((post) => post.slug === currentSlug);
-  if (index === -1 || posts.length <= 1) return undefined;
-  return posts[(index + 1) % posts.length];
+export async function ensurePostsTable(): Promise<void> {
+  if (tableInitialized) return;
+
+  const pool = getDbPool();
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS posts (
+      slug TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      excerpt TEXT NOT NULL,
+      published_date TEXT NOT NULL,
+      read_time TEXT NOT NULL,
+      tag TEXT NOT NULL,
+      content JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  const countResult = await pool.query<{ count: string }>(
+    "SELECT COUNT(*)::text AS count FROM posts",
+  );
+  const existingCount = Number(countResult.rows[0]?.count ?? "0");
+
+  if (existingCount === 0) {
+    for (let i = 0; i < SEED_POSTS.length; i++) {
+      const post = SEED_POSTS[i];
+      // Offset created_at slightly so seed posts preserve chronological order
+      await pool.query(
+        `INSERT INTO posts (slug, title, excerpt, published_date, read_time, tag, content, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW() - ($8 || ' minutes')::interval)
+         ON CONFLICT (slug) DO NOTHING`,
+        [
+          post.slug,
+          post.title,
+          post.excerpt,
+          post.date,
+          post.readTime,
+          post.tag,
+          JSON.stringify(post.content),
+          String(i * 10),
+        ],
+      );
+    }
+  }
+
+  tableInitialized = true;
+}
+
+export function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function estimateReadTime(paragraphs: string[]): string {
+  const words = paragraphs.join(" ").trim().split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(words / 200));
+  return `${minutes} min read`;
+}
+
+export async function getAllPosts(): Promise<Post[]> {
+  try {
+    await ensurePostsTable();
+    const pool = getDbPool();
+    const result = await pool.query<DbPostRow>(
+      `SELECT slug, title, excerpt, published_date, read_time, tag, content
+       FROM posts
+       ORDER BY created_at DESC`,
+    );
+    return result.rows.map(mapRowToPost);
+  } catch (error) {
+    console.warn("[getAllPosts] Falling back to seed posts:", error);
+    return SEED_POSTS;
+  }
+}
+
+export async function getPostBySlug(slug: string): Promise<Post | undefined> {
+  try {
+    await ensurePostsTable();
+    const pool = getDbPool();
+    const result = await pool.query<DbPostRow>(
+      `SELECT slug, title, excerpt, published_date, read_time, tag, content
+       FROM posts
+       WHERE slug = $1
+       LIMIT 1`,
+      [slug],
+    );
+    return result.rows[0] ? mapRowToPost(result.rows[0]) : undefined;
+  } catch (error) {
+    console.warn("[getPostBySlug] Falling back to seed posts:", error);
+    return SEED_POSTS.find((post) => post.slug === slug);
+  }
+}
+
+export async function getNextPost(currentSlug: string): Promise<Post | undefined> {
+  const all = await getAllPosts();
+  const index = all.findIndex((post) => post.slug === currentSlug);
+  if (index === -1 || all.length <= 1) return undefined;
+  return all[(index + 1) % all.length];
+}
+
+export async function createPost(input: CreatePostInput): Promise<Post> {
+  await ensurePostsTable();
+  const pool = getDbPool();
+
+  const baseSlug = slugify(input.slug?.trim() || input.title) || `post-${Date.now()}`;
+  let finalSlug = baseSlug;
+
+  // Ensure unique slug if duplicate exists
+  const existing = await pool.query("SELECT slug FROM posts WHERE slug = $1", [
+    finalSlug,
+  ]);
+  if (existing.rows.length > 0) {
+    finalSlug = `${baseSlug}-${Math.floor(100 + Math.random() * 900)}`;
+  }
+
+  const formattedDate = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+
+  const readTime = estimateReadTime(input.content);
+
+  const result = await pool.query<DbPostRow>(
+    `INSERT INTO posts (slug, title, excerpt, published_date, read_time, tag, content)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+     RETURNING slug, title, excerpt, published_date, read_time, tag, content`,
+    [
+      finalSlug,
+      input.title.trim(),
+      input.excerpt.trim(),
+      formattedDate,
+      readTime,
+      input.tag.trim() || "General",
+      JSON.stringify(input.content),
+    ],
+  );
+
+  return mapRowToPost(result.rows[0]);
+}
+
+export async function deletePost(slug: string): Promise<boolean> {
+  await ensurePostsTable();
+  const pool = getDbPool();
+  const result = await pool.query("DELETE FROM posts WHERE slug = $1", [slug]);
+  return (result.rowCount ?? 0) > 0;
 }

@@ -2,23 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArticleReader } from "../../../components/ArticleReader";
-import { getAllPosts, getNextPost, getPostBySlug } from "../../../lib/posts";
+import { getNextPost, getPostBySlug } from "../../../lib/posts";
+
+export const dynamic = "force-dynamic";
 
 interface PostPageProps {
   params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  return getAllPosts().map((post) => ({
-    slug: post.slug,
-  }));
 }
 
 export async function generateMetadata({
   params,
 }: PostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
 
   if (!post) {
     return { title: "Post Not Found" };
@@ -32,13 +28,13 @@ export async function generateMetadata({
 
 export default async function PostPage({ params }: PostPageProps) {
   const { slug } = await params;
-  const post = getPostBySlug(slug);
+  const post = await getPostBySlug(slug);
 
   if (!post) {
     notFound();
   }
 
-  const nextPost = getNextPost(post.slug);
+  const nextPost = await getNextPost(post.slug);
 
   return (
     <article className="mx-auto w-full max-w-2xl px-6 py-14">
