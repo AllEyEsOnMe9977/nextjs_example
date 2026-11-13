@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { DbStatusBadge } from "../components/DbStatusBadge";
 import { Navbar } from "../components/Navbar";
 import "./globals.css";
 
@@ -51,9 +52,14 @@ export default function RootLayout({
           id="about"
           className="border-t border-zinc-200/80 py-10 text-sm text-zinc-500 transition-colors duration-300 dark:border-zinc-800/80 dark:text-zinc-400"
         >
-          <div className="mx-auto flex max-w-2xl flex-col justify-between gap-2 px-6 sm:flex-row">
-            <p>Field Notes — Thoughts on building and writing.</p>
-            <p>© {new Date().getFullYear()}</p>
+          <div className="mx-auto flex max-w-2xl flex-col justify-between gap-4 px-6 sm:flex-row sm:items-center">
+            <div>
+              <p>Field Notes — Thoughts on building and writing.</p>
+              <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+                © {new Date().getFullYear()}
+              </p>
+            </div>
+            <DbStatusBadge />
           </div>
         </footer>
       </body>
