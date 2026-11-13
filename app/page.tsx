@@ -1,4 +1,4 @@
-import { PostCard } from "../components/PostCard";
+import { PostFeed } from "../components/PostFeed";
 import { getAllPosts } from "../lib/posts";
 
 export default function Home() {
@@ -16,10 +16,7 @@ export default function Home() {
         </p>
       </section>
 
-      <section
-        aria-label="Blog posts"
-        className="divide-y divide-zinc-200/80 pt-6 dark:divide-zinc-800/80"
-      >
+      <PostFeed posts={posts} />
         {posts.map((post) => (
           <PostCard key={post.slug} post={post} />
         ))}
