@@ -17,10 +17,6 @@ export default function Home() {
       </section>
 
       <PostFeed posts={posts} />
-        {posts.map((post) => (
-          <PostCard key={post.slug} post={post} />
-        ))}
-      </section>
     </div>
   );
 }
