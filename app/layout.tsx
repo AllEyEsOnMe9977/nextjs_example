@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         >
           <div className="mx-auto flex max-w-2xl flex-col justify-between gap-2 px-6 sm:flex-row">
             <p>Field Notes — Thoughts on building and writing.</p>
-            <p>© {new Date().getFullYear()}</p>
+            <p>© 2026</p>
           </div>
         </footer>
       </body>
