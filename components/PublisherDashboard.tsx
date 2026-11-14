@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { formatNumber, formatReadTime, translateTag } from "../lib/i18n";
-import { slugify, type Post } from "../lib/posts";
+import type { Post } from "../lib/posts";
 import { useLanguage } from "./LanguageProvider";
 
 interface PublisherDashboardProps {
@@ -30,8 +30,17 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
     slug?: string;
   } | null>(null);
 
+  // Compute slug locally so client bundles do not import server-only pg modules via lib/posts
   const previewSlug = useMemo(() => {
-    return slugify(title) || "your-article-slug";
+    return (
+      title
+        .toLowerCase()
+        .trim()
+        .replace(/[^\p{L}\p{N}\s-]/gu, "")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "") || "your-article-slug"
+    );
   }, [title]);
 
   const previewParagraphs = useMemo(() => {
