@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatNumber } from "../lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 interface HealthResponse {
   ok: boolean;
@@ -12,6 +14,7 @@ interface HealthResponse {
 }
 
 export function DbStatusBadge() {
+  const { locale, t } = useLanguage();
   const [status, setStatus] = useState<"checking" | "connected" | "error">(
     "checking",
   );
@@ -47,7 +50,6 @@ export function DbStatusBadge() {
           onClick={() => setExpanded((prev) => !prev)}
           className="inline-flex items-center gap-2 rounded-full border border-zinc-200/90 bg-zinc-50/80 px-3 py-1 text-xs font-medium text-zinc-700 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:bg-zinc-800"
         >
-          {/* Animated Status Dot */}
           <span className="relative flex h-2 w-2">
             {status === "connected" && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
@@ -62,11 +64,11 @@ export function DbStatusBadge() {
               }`}
             />
           </span>
-
           <span>
-            {status === "checking" && "Checking DB..."}
-            {status === "connected" && `DB Connected · ${data?.latencyMs}ms`}
-            {status === "error" && "DB Disconnected"}
+            {status === "checking" && t.db.checking}
+            {status === "connected" &&
+              `${t.db.connected} • ${formatNumber(data?.latencyMs ?? 0, locale)}ms`}
+            {status === "error" && t.db.disconnected}
           </span>
         </button>
 
@@ -74,8 +76,8 @@ export function DbStatusBadge() {
           type="button"
           onClick={checkConnection}
           disabled={status === "checking"}
-          aria-label="Re-test database connection"
-          title="Re-test database connection"
+          aria-label={t.db.retestAria}
+          title={t.db.retestAria}
           className="flex h-7 w-7 items-center justify-center rounded-full border border-zinc-200/90 text-zinc-500 transition-all duration-200 hover:border-zinc-300 hover:text-zinc-900 active:scale-90 disabled:opacity-40 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
         >
           <svg
@@ -97,34 +99,39 @@ export function DbStatusBadge() {
 
       {/* Expandable Diagnostics Popover */}
       {expanded && data && (
-        <div className="animate-fade-slide-up mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-3.5 text-left text-xs shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div className="animate-fade-slide-up mt-2 w-72 rounded-xl border border-zinc-200 bg-white p-3.5 text-start text-xs shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
           {data.ok ? (
             <dl className="space-y-1.5 text-zinc-600 dark:text-zinc-400">
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <dt className="font-medium text-zinc-900 dark:text-zinc-200">
-                  Engine
+                  {t.db.engine}
                 </dt>
-                <dd>{data.version}</dd>
+                <dd dir="ltr">{data.version}</dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <dt className="font-medium text-zinc-900 dark:text-zinc-200">
-                  Database
+                  {t.db.database}
                 </dt>
-                <dd className="font-mono">{data.database}</dd>
+                <dd dir="ltr" className="font-mono">
+                  {data.database}
+                </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <dt className="font-medium text-zinc-900 dark:text-zinc-200">
-                  Latency
+                  {t.db.latency}
                 </dt>
-                <dd>{data.latencyMs} ms</dd>
+                <dd dir="ltr">{formatNumber(data.latencyMs, locale)} ms</dd>
               </div>
             </dl>
           ) : (
             <div className="space-y-1">
               <p className="font-medium text-rose-600 dark:text-rose-400">
-                Connection Error
+                {t.db.connectionError}
               </p>
-              <p className="break-words font-mono text-[11px] text-zinc-500 dark:text-zinc-400">
+              <p
+                dir="ltr"
+                className="break-words font-mono text-[11px] text-zinc-500 dark:text-zinc-400"
+              >
                 {data.error}
               </p>
             </div>

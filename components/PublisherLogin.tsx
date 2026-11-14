@@ -2,9 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLanguage } from "./LanguageProvider";
 
 export function PublisherLogin() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,8 +22,8 @@ export function PublisherLogin() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
-
       const data = await res.json();
+
       if (!res.ok) {
         setError(data.error || "Authentication failed.");
         setLoading(false);
@@ -30,7 +32,7 @@ export function PublisherLogin() {
 
       router.refresh();
     } catch {
-      setError("Network error while signing in.");
+      setError(t.login.networkError);
       setLoading(false);
     }
   };
@@ -55,11 +57,10 @@ export function PublisherLogin() {
         </div>
 
         <h1 className="mt-5 text-xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Publisher Access
+          {t.login.title}
         </h1>
         <p className="mt-1.5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
-          Enter your publisher password to write, publish, and manage articles
-          stored in PostgreSQL.
+          {t.login.description}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -68,16 +69,17 @@ export function PublisherLogin() {
               htmlFor="publisher-password"
               className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
             >
-              Publisher Password
+              {t.login.passwordLabel}
             </label>
             <input
               id="publisher-password"
               type="password"
+              dir="ltr"
               required
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••••••"
+              placeholder="••••••••"
               className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-transparent px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
             />
           </div>
@@ -93,7 +95,7 @@ export function PublisherLogin() {
             disabled={loading}
             className="w-full rounded-xl bg-zinc-900 py-2.5 text-sm font-medium text-white transition-all duration-200 hover:bg-zinc-800 active:scale-[0.99] disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
           >
-            {loading ? "Verifying..." : "Unlock Studio"}
+            {loading ? t.login.verifying : t.login.unlock}
           </button>
         </form>
       </div>

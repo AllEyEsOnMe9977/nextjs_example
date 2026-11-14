@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import type { Post } from "../lib/posts";
+import { formatNumber, formatReadTime, translateTag } from "../lib/i18n";
+import { slugify, type Post } from "../lib/posts";
+import { useLanguage } from "./LanguageProvider";
 
 interface PublisherDashboardProps {
   initialPosts: Post[];
@@ -13,14 +15,13 @@ const PRESET_TAGS = ["Engineering", "Design", "Writing", "Notes"];
 
 export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
   const router = useRouter();
+  const { locale, t } = useLanguage();
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [mode, setMode] = useState<"write" | "preview">("write");
-
   const [title, setTitle] = useState("");
   const [tag, setTag] = useState("Engineering");
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
-
   const [submitting, setSubmitting] = useState(false);
   const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -30,15 +31,7 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
   } | null>(null);
 
   const previewSlug = useMemo(() => {
-    return (
-      title
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") || "your-article-slug"
-    );
+    return slugify(title) || "your-article-slug";
   }, [title]);
 
   const previewParagraphs = useMemo(() => {
@@ -59,8 +52,8 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title, tag, excerpt, content }),
       });
-
       const data = await res.json();
+
       if (!res.ok) {
         setFeedback({
           type: "error",
@@ -77,14 +70,14 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
       setMode("write");
       setFeedback({
         type: "success",
-        message: "Published directly to PostgreSQL!",
+        message: t.dashboard.publishedSuccess,
         slug: data.post.slug,
       });
       router.refresh();
     } catch {
       setFeedback({
         type: "error",
-        message: "Network error while saving to PostgreSQL.",
+        message: t.dashboard.publishNetworkError,
       });
     } finally {
       setSubmitting(false);
@@ -94,9 +87,10 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
   const handleDelete = async (slug: string) => {
     setDeletingSlug(slug);
     setFeedback(null);
-
     try {
-      const res = await fetch(`/api/posts/${slug}`, { method: "DELETE" });
+      const res = await fetch(`/api/posts/${encodeURIComponent(slug)}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const data = await res.json();
         setFeedback({
@@ -105,17 +99,16 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
         });
         return;
       }
-
       setPosts((prev) => prev.filter((p) => p.slug !== slug));
       setFeedback({
         type: "success",
-        message: "Article deleted from PostgreSQL.",
+        message: t.dashboard.deletedSuccess,
       });
       router.refresh();
     } catch {
       setFeedback({
         type: "error",
-        message: "Network error while deleting post.",
+        message: t.dashboard.deleteNetworkError,
       });
     } finally {
       setDeletingSlug(null);
@@ -134,10 +127,10 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-medium text-emerald-600 dark:text-emerald-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Authenticated Publisher Session
+            {t.dashboard.sessionBadge}
           </div>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Publisher Studio
+            {t.dashboard.title}
           </h1>
         </div>
 
@@ -146,14 +139,14 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
           onClick={handleLogout}
           className="rounded-full border border-zinc-200 px-3.5 py-1.5 text-xs font-medium text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
         >
-          Sign out
+          {t.dashboard.signOut}
         </button>
       </div>
 
       {/* Feedback Banner */}
       {feedback && (
         <div
-          className={`animate-fade-slide-up mt-6 flex items-center justify-between rounded-xl border px-4 py-3 text-xs font-medium ${
+          className={`animate-fade-slide-up mt-6 flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-xs font-medium ${
             feedback.type === "success"
               ? "border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300"
               : "border-rose-200 bg-rose-50/70 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-300"
@@ -165,7 +158,7 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
               href={`/posts/${feedback.slug}`}
               className="underline underline-offset-2 hover:opacity-80"
             >
-              View live post →
+              {t.dashboard.viewLivePost}
             </Link>
           )}
         </div>
@@ -175,9 +168,8 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
       <section className="mt-8 rounded-2xl border border-zinc-200/90 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900/40">
         <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-zinc-800/80">
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            New Article
+            {t.dashboard.newArticle}
           </h2>
-
           <div className="inline-flex rounded-full border border-zinc-200 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900">
             <button
               type="button"
@@ -188,7 +180,7 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                   : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
               }`}
             >
-              Write
+              {t.dashboard.writeTab}
             </button>
             <button
               type="button"
@@ -199,7 +191,7 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                   : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400"
               }`}
             >
-              Preview
+              {t.dashboard.previewTab}
             </button>
           </div>
         </div>
@@ -211,18 +203,19 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                 htmlFor="post-title"
                 className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Title
+                {t.dashboard.titleLabel}
               </label>
               <input
                 id="post-title"
                 type="text"
+                dir="auto"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Deploying PostgreSQL on Coolify"
+                placeholder={t.dashboard.titlePlaceholder}
                 className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-transparent px-3.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
               />
-              <p className="mt-1 font-mono text-[11px] text-zinc-400">
+              <p dir="ltr" className="mt-1 text-start font-mono text-[11px] text-zinc-400">
                 /posts/{previewSlug}
               </p>
             </div>
@@ -232,7 +225,7 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                 htmlFor="post-tag"
                 className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Topic Tag
+                {t.dashboard.tagLabel}
               </label>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 {PRESET_TAGS.map((preset) => (
@@ -246,15 +239,16 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                         : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200/80 dark:bg-zinc-800 dark:text-zinc-400"
                     }`}
                   >
-                    {preset}
+                    {translateTag(preset, locale)}
                   </button>
                 ))}
                 <input
                   id="post-tag"
                   type="text"
+                  dir="auto"
                   value={tag}
                   onChange={(e) => setTag(e.target.value)}
-                  placeholder="Custom tag"
+                  placeholder={t.dashboard.customTagPlaceholder}
                   className="w-28 rounded-full border border-zinc-200 bg-transparent px-3 py-1 text-xs text-zinc-900 focus:border-zinc-900 focus:outline-none dark:border-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
                 />
               </div>
@@ -265,15 +259,16 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                 htmlFor="post-excerpt"
                 className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Excerpt
+                {t.dashboard.excerptLabel}
               </label>
               <textarea
                 id="post-excerpt"
                 rows={2}
+                dir="auto"
                 required
                 value={excerpt}
                 onChange={(e) => setExcerpt(e.target.value)}
-                placeholder="A short summary shown on the home feed and SEO metadata..."
+                placeholder={t.dashboard.excerptPlaceholder}
                 className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-transparent px-3.5 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
               />
             </div>
@@ -283,20 +278,19 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                 htmlFor="post-content"
                 className="block text-xs font-medium text-zinc-700 dark:text-zinc-300"
               >
-                Article Body{" "}
+                {t.dashboard.bodyLabel}{" "}
                 <span className="font-normal text-zinc-400">
-                  (separate paragraphs with a blank line)
+                  {t.dashboard.bodyHint}
                 </span>
               </label>
               <textarea
                 id="post-content"
                 rows={7}
+                dir="auto"
                 required
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder={
-                  "Write your first paragraph here...\n\nPress Enter twice to start a new paragraph."
-                }
+                placeholder={t.dashboard.bodyPlaceholder}
                 className="mt-1.5 w-full rounded-xl border border-zinc-200 bg-transparent px-3.5 py-2.5 text-sm leading-relaxed text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none dark:border-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400"
               />
             </div>
@@ -307,26 +301,36 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
                 disabled={submitting}
                 className="rounded-full bg-zinc-900 px-5 py-2 text-xs font-medium text-white transition-all duration-200 hover:bg-zinc-800 active:scale-95 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
               >
-                {submitting ? "Saving to PostgreSQL..." : "Publish Article"}
+                {submitting ? t.dashboard.saving : t.dashboard.publish}
               </button>
             </div>
           </form>
         ) : (
           <div className="animate-fade-slide-up mt-6 space-y-4">
             <span className="inline-block rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-              {tag || "General"}
+              {translateTag(tag || "General", locale)}
             </span>
-            <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-              {title || "Untitled Article"}
+            <h3
+              dir="auto"
+              className="text-2xl font-bold text-zinc-900 dark:text-zinc-50"
+            >
+              {title || t.dashboard.untitled}
             </h3>
-            <p className="text-base text-zinc-600 dark:text-zinc-400">
-              {excerpt || "Your article excerpt will appear here."}
+            <p
+              dir="auto"
+              className="text-base text-zinc-600 dark:text-zinc-400"
+            >
+              {excerpt || t.dashboard.previewExcerptEmpty}
             </p>
             <div className="space-y-4 border-t border-zinc-100 pt-4 text-sm leading-7 text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
               {previewParagraphs.length > 0 ? (
-                previewParagraphs.map((p, idx) => <p key={idx}>{p}</p>)
+                previewParagraphs.map((p, idx) => (
+                  <p key={idx} dir="auto">
+                    {p}
+                  </p>
+                ))
               ) : (
-                <p className="text-zinc-400">Nothing written yet.</p>
+                <p className="text-zinc-400">{t.dashboard.previewBodyEmpty}</p>
               )}
             </div>
           </div>
@@ -337,9 +341,11 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
       <section className="mt-12">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            Database Articles ({posts.length})
+            {t.dashboard.dbArticles} ({formatNumber(posts.length, locale)})
           </h2>
-          <span className="font-mono text-xs text-zinc-400">table: posts</span>
+          <span dir="ltr" className="font-mono text-xs text-zinc-400">
+            table: posts
+          </span>
         </div>
 
         <div className="mt-4 divide-y divide-zinc-200/80 rounded-2xl border border-zinc-200/80 dark:divide-zinc-800/80 dark:border-zinc-800/80">
@@ -351,22 +357,25 @@ export function PublisherDashboard({ initialPosts }: PublisherDashboardProps) {
               <div className="min-w-0">
                 <Link
                   href={`/posts/${post.slug}`}
-                  className="truncate text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-100"
+                  dir="auto"
+                  className="block truncate text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-100"
                 >
                   {post.title}
                 </Link>
                 <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                  {post.tag} · {post.date} · {post.readTime}
+                  {translateTag(post.tag, locale)} &bull; {post.date} &bull;{" "}
+                  {formatReadTime(post.readTime, locale)}
                 </p>
               </div>
-
               <button
                 type="button"
                 onClick={() => handleDelete(post.slug)}
                 disabled={deletingSlug === post.slug}
                 className="shrink-0 rounded-full border border-zinc-200 px-3 py-1 text-xs font-medium text-rose-600 transition-colors hover:border-rose-200 hover:bg-rose-50 disabled:opacity-40 dark:border-zinc-800 dark:text-rose-400 dark:hover:border-rose-900 dark:hover:bg-rose-950/40"
               >
-                {deletingSlug === post.slug ? "Deleting..." : "Delete"}
+                {deletingSlug === post.slug
+                  ? t.dashboard.deleting
+                  : t.dashboard.delete}
               </button>
             </div>
           ))}

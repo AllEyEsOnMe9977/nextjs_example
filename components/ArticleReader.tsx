@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { formatNumber } from "../lib/i18n";
+import { useLanguage } from "./LanguageProvider";
 
 type FontSize = "sm" | "md" | "lg";
 
@@ -22,6 +24,7 @@ const FONT_SIZE_STYLES: Record<FontSize, string> = {
 };
 
 export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
+  const { locale, t } = useLanguage();
   const articleRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const [showTopBtn, setShowTopBtn] = useState(false);
@@ -31,13 +34,13 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
   const [particles, setParticles] = useState<BurstParticle[]>([]);
   const [copied, setCopied] = useState(false);
 
-  // Load persisted font preference & article claps
   useEffect(() => {
-    const savedSize = localStorage.getItem("reader-font-size") as FontSize | null;
+    const savedSize = localStorage.getItem(
+      "reader-font-size",
+    ) as FontSize | null;
     if (savedSize && ["sm", "md", "lg"].includes(savedSize)) {
       setFontSize(savedSize);
     }
-
     const savedClaps = Number(localStorage.getItem(`claps:${slug}`) || "0");
     if (savedClaps > 0) {
       setClaps(savedClaps);
@@ -45,21 +48,17 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
     }
   }, [slug]);
 
-  // Track reading progress relative to the article body
   useEffect(() => {
     const handleScroll = () => {
       const el = articleRef.current;
       if (!el) return;
-
       const rect = el.getBoundingClientRect();
       const windowHeight = window.innerHeight;
       const totalScrollable = rect.height - windowHeight * 0.55;
-
       if (totalScrollable <= 0) {
         setProgress(100);
         return;
       }
-
       const scrolled = -rect.top + windowHeight * 0.2;
       const pct = Math.min(100, Math.max(0, (scrolled / totalScrollable) * 100));
       setProgress(pct);
@@ -89,7 +88,6 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
     const id = Date.now() + Math.random();
     const xOffset = Math.round((Math.random() - 0.5) * 28);
     setParticles((prev) => [...prev, { id, xOffset }]);
-
     setTimeout(() => {
       setParticles((prev) => prev.filter((p) => p.id !== id));
     }, 750);
@@ -113,7 +111,7 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
 
   return (
     <>
-      {/* Reading Progress Bar pinned under sticky Navbar (h-16 = top-16) */}
+      {/* Reading Progress Bar */}
       <div
         aria-hidden="true"
         className="fixed top-16 right-0 left-0 z-20 h-[2px] bg-transparent"
@@ -128,18 +126,18 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200/80 pb-5 dark:border-zinc-800/80">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500">
-            Text size
+            {t.reader.textSize}
           </span>
           <div
             role="group"
-            aria-label="Adjust article font size"
+            aria-label={t.reader.textSizeAria}
             className="inline-flex items-center rounded-full border border-zinc-200/90 bg-zinc-50 p-0.5 dark:border-zinc-800 dark:bg-zinc-900"
           >
             {(
               [
-                { id: "sm", label: "S" },
-                { id: "md", label: "M" },
-                { id: "lg", label: "L" },
+                { id: "sm", label: t.reader.sizes.sm },
+                { id: "md", label: t.reader.sizes.md },
+                { id: "lg", label: t.reader.sizes.lg },
               ] as const
             ).map((option) => {
               const active = fontSize === option.id;
@@ -149,7 +147,7 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
                   type="button"
                   onClick={() => handleFontSizeChange(option.id)}
                   aria-pressed={active}
-                  className={`h-6 w-7 rounded-full text-xs font-medium transition-all duration-200 ${
+                  className={`h-6 min-w-7 rounded-full px-2 text-xs font-medium transition-all duration-200 ${
                     active
                       ? "bg-white text-zinc-900 shadow-xs dark:bg-zinc-800 dark:text-zinc-100"
                       : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -184,7 +182,7 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
                 />
               </svg>
               <span className="text-emerald-700 dark:text-emerald-400">
-                Link copied
+                {t.reader.linkCopied}
               </span>
             </>
           ) : (
@@ -203,13 +201,13 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
                   strokeLinejoin="round"
                 />
               </svg>
-              <span>Share</span>
+              <span>{t.reader.share}</span>
             </>
           )}
         </button>
       </div>
 
-      {/* Article Paragraphs with smooth typography scaling & staggered entrance */}
+      {/* Article Paragraphs */}
       <div
         ref={articleRef}
         className={`mt-8 space-y-6 text-zinc-700 transition-[font-size,line-height] duration-300 dark:text-zinc-300 ${FONT_SIZE_STYLES[fontSize]}`}
@@ -217,6 +215,7 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
         {content.map((paragraph, index) => (
           <p
             key={index}
+            dir="auto"
             style={{ animationDelay: `${index * 70}ms` }}
             className="animate-fade-slide-up"
           >
@@ -226,13 +225,13 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
       </div>
 
       {/* Bottom Appreciation / Clap Bar */}
-      <div className="mt-12 flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-zinc-50/70 px-5 py-4 dark:border-zinc-800/80 dark:bg-zinc-900/50">
+      <div className="mt-12 flex items-center justify-between gap-4 rounded-2xl border border-zinc-200/80 bg-zinc-50/70 px-5 py-4 dark:border-zinc-800/80 dark:bg-zinc-900/50">
         <div>
           <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-            Enjoyed this note?
+            {t.reader.enjoyedTitle}
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Leave a clap or share it with a friend.
+            {t.reader.enjoyedSubtitle}
           </p>
         </div>
 
@@ -241,7 +240,10 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
             {particles.map((particle) => (
               <span
                 key={particle.id}
-                style={{ "--x-offset": `${particle.xOffset}px` } as React.CSSProperties}
+                dir="ltr"
+                style={
+                  { "--x-offset": `${particle.xOffset}px` } as React.CSSProperties
+                }
                 className="animate-float-up pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 text-xs font-semibold text-zinc-900 dark:text-zinc-100"
               >
                 +1
@@ -251,7 +253,7 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
             <button
               type="button"
               onClick={handleClap}
-              aria-label="Applaud this article"
+              aria-label={t.reader.applaudAria}
               className={`group inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-medium transition-all duration-200 active:scale-90 ${
                 hasClapped
                   ? "border-zinc-900 bg-zinc-900 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-900"
@@ -270,7 +272,9 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
               >
                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
               </svg>
-              <span>{claps > 0 ? claps : "Appreciate"}</span>
+              <span>
+                {claps > 0 ? formatNumber(claps, locale) : t.reader.appreciate}
+              </span>
             </button>
           </div>
         </div>
@@ -280,8 +284,8 @@ export function ArticleReader({ slug, title, content }: ArticleReaderProps) {
       <button
         type="button"
         onClick={scrollToTop}
-        aria-label="Scroll back to top"
-        className={`fixed right-6 bottom-6 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200/90 bg-white/90 text-zinc-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100 ${
+        aria-label={t.reader.scrollTopAria}
+        className={`fixed end-6 bottom-6 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200/90 bg-white/90 text-zinc-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:-translate-y-0.5 hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100 ${
           showTopBtn
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0"

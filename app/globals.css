@@ -17,6 +17,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-persian: var(--font-vazirmatn);
 }
 
 @keyframes fade-slide-up {
@@ -59,4 +60,8 @@ body {
   transition:
     background-color 0.3s ease,
     color 0.3s ease;
+}
+
+html[lang="fa"] body {
+  font-family: var(--font-persian), var(--font-sans), system-ui, sans-serif;
 }
